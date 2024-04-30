@@ -24,12 +24,21 @@ class Scraper:
   def setDriver(self,):
     self.driver = webdriver.Chrome()
   
-  def Start(self,output="./images",url=None):
+  def Start(self,output="./webps",url=None):
     if url == None:
       url = self.url
     
     links = []
-      
+    
+
+
+
+    if not os.path.exists(output):
+        os.makedirs(output)
+        print(f"Folder '{output}' created successfully.")
+    else:
+        print(f"Folder '{output}' already exists.")
+
     driver = self.driver
     driver.implicitly_wait(300)
     print('scraping')
@@ -45,14 +54,24 @@ class Scraper:
       
     driver.get(links[0])
     title = driver.find_element(By.CLASS_NAME,'reader--header-title')
+    if not os.path.exists(os.path.join(output,title.text)):
+        os.makedirs(os.path.join(output,title.text))
+        print(f"Folder '{os.path.join(output,title.text)}' created successfully.")
+    else:
+        print(f"Folder '{os.path.join(output,title.text)}' already exists.")
+
     time.sleep(6)
     mangaImages = driver.find_elements(By.CLASS_NAME,'img')
     print(len(mangaImages))
-    for image in mangaImages:
-      
-      # status = image.find_element(By.CLASS_NAME,'img').get_attribute("src")
-      print(image.get_attribute('src'))
-    # print(links)
+    for image in mangaImages: 
+      count = 1
+      print(f'image {count}/{len(mangaImages)} ')
+      count += 1
+      try:
+          urllib.request.urlretrieve(image.get_attribute('src').replace("blob:",""), os.path.join(output,title.text))
+          print(f"Image saved successfully as '{output}'.")
+      except Exception as e:
+          print(f"Failed to save image: {e}")
     WebDriverWait(driver, 900).until(
         EC.presence_of_element_located((By.ID, "myDynamicElement"))
     )
