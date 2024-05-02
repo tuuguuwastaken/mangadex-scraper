@@ -20,9 +20,11 @@ class Downloader:
         res = requests.get(self.baseURLmanga.format(id))
         data = res.json().get('data')
         ids = []
+        chapCount = 0
         for chapter in data:
-            ids.append({"id":chapter.get("id"),"name":f"Chapter {chapter.get('attributes').get('chapter')}"})
-        print(ids)
+            if chapter.get("attributes").get("translatedLanguage") == "en":
+                ids.append({"id":chapter.get("id"),"name":f"Chapter {chapCount}"})
+                chapCount = chapCount + 1
         for id in ids:
             chapterResponse = requests.get(self.baseURLChapter.format(id.get("id")))
             baseURL = chapterResponse.json().get("baseUrl")
@@ -33,7 +35,6 @@ class Downloader:
             count = 1
             for img in imgs:
                 url = imgUrl.format(baseURL, hash, img)
-                print(url)
                 imgRes = requests.get(url)
                 img_data = imgRes.content
                 if not imgRes.status_code == 200:
@@ -44,6 +45,7 @@ class Downloader:
                     os.makedirs(output)
                 image_filename = os.path.join(output, f"{count}.jpg")
                 with open(image_filename, "wb") as image_file:
+                    print(f"Downloaded {id.get("name")} : {count}/ {len(imgs)}")
                     image_file.write(img_data)
                 count = count + 1
 
@@ -65,5 +67,5 @@ class Downloader:
 
 
 if __name__ == "__main__":
-    api = Downloader(url="https://mangadex.org/title/960a03a6-0c21-470c-be84-973304b2f7bd/oh-my-devil",)
+    api = Downloader(url="https://mangadex.org/title/ff4669dd-c512-4d30-aeb7-6ceec5308a76/saihate-ni-madou",)
     api.start()
