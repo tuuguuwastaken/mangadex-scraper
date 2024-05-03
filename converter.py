@@ -15,7 +15,7 @@ class Converter:
             images = os.listdir(os.path.join(self.input, file))
             if not os.path.exists(os.path.join(self.output, file)):
                 os.makedirs(os.path.join(self.output, str(file)))
-            count = 0
+            count = 1
             for image in images:
                 if image.lower().endswith('.png') or image.lower().endswith('.jpg'):
                     img_path = os.path.join(self.input, file, image)
@@ -24,7 +24,7 @@ class Converter:
                         print(f"converted {file} : {count} / {len(images)}")
                         img.save(output_path, 'WEBP')
                         count = count + 1
-
+        return True
 
 if __name__ == "__main__":
     conv = Converter()
