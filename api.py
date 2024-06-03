@@ -2,19 +2,57 @@ import requests
 import re
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class Downloader:
-    def __init__(self, url=None, output="./images") -> None:
+    def __init__(self, url=None, output="./images", max_workers=5) -> None:
         self.output = output
         self.url = url
         self.baseURLmanga = "https://api.mangadex.org/chapter?limit=100&manga={}"
         self.baseURLChapter = "https://api.mangadex.org/at-home/server/{}"
+        self.max_workers = max_workers
 
     def extractId(self, url):
         pattern = r"([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"
         uuid = re.search(pattern, url).group(1)
         print(uuid)
         return uuid
+
+    def download_image(self, url, output_path, chapter_name, img_num, total_imgs):
+        imgRes = requests.get(url)
+        img_data = imgRes.content
+        if imgRes.status_code != 200:
+            print(f"Failed to download image {img_num} of {total_imgs} in {chapter_name}. Status code: {imgRes.status_code}")
+            return False
+        with open(output_path, "wb") as image_file:
+            print(f"Downloaded {chapter_name} : {img_num}/{total_imgs}")
+            image_file.write(img_data)
+        return True
+
+    def download_chapter(self, chapter):
+        chapter_id = chapter.get("id")
+        chapter_name = chapter.get("name")
+        chapterResponse = requests.get(self.baseURLChapter.format(chapter_id))
+        baseURL = chapterResponse.json().get("baseUrl")
+        hash = chapterResponse.json().get("chapter").get("hash")
+        imgs = chapterResponse.json().get("chapter").get("data")
+
+        imgUrl = "{}/data/{}/{}"
+        output_dir = os.path.join(self.output, chapter_name)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        tasks = []
+        with ThreadPoolExecutor(max_workers=len(imgs)) as executor:
+            for count, img in enumerate(imgs, start=1):
+                url = imgUrl.format(baseURL, hash, img)
+                output_path = os.path.join(output_dir, f"{count}.jpg")
+                tasks.append(executor.submit(self.download_image, url, output_path, chapter_name, count, len(imgs)))
+
+            for task in as_completed(tasks):
+                if not task.result():
+                    print(f"An error occurred while downloading an image in {chapter_name}.")
+        return True
 
     def getChapterData(self, id):
         res = requests.get(self.baseURLmanga.format(id))
@@ -35,36 +73,10 @@ class Downloader:
                         }
                     )
                     chapCount += 1
-            for id in ids:
-                chapterResponse = requests.get(
-                    self.baseURLChapter.format(id.get("id"))
-                )
-                baseURL = chapterResponse.json().get("baseUrl")
-                hash = chapterResponse.json().get("chapter").get("hash")
-                imgs = chapterResponse.json().get("chapter").get("data")
 
-                imgUrl = "{}/data/{}/{}"
-                count = 1
-                for img in imgs:
-                    url = imgUrl.format(baseURL, hash, img)
-                    imgRes = requests.get(url)
-                    img_data = imgRes.content
-                    if imgRes.status_code != 200:
-                        print(
-                            "Failed to download image. Status code:",
-                            imgRes.status_code,
-                        )
-                        return 0
-                    output = os.path.join(self.output, id.get("name"))
-                    if not os.path.exists(output):
-                        os.makedirs(output)
-                    image_filename = os.path.join(output, f"{count}.jpg")
-                    with open(image_filename, "wb") as image_file:
-                        print(
-                            f"Downloaded {id.get('name')} : {count}/ {len(imgs)}"
-                        )
-                        image_file.write(img_data)
-                    count += 1
+            for chapter in ids:
+                self.download_chapter(chapter)
+
         except Exception as e:
             return e
         return True
